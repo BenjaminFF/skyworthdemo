@@ -7,11 +7,11 @@
           <div class="h-row3" style="background-color: #c1c1c1;color: white">{{tableThs[2]}}</div>
         </div>
         <div class="row-container" v-for="item in items">
-          <div class="row1">{{item.flagName}}</div>
-          <div class="row2">{{item.belongedMenu}}</div>
+          <div class="row1">{{item.Name}}</div>
+          <div class="row2">{{item.Category.Name}}</div>
           <div class="row3">
-            <div class="row3-edit" @click="editDialog.visibility=true">编辑</div>
-            <div class="row3-delete" @click="delDialog.visibility=true">删除</div>
+            <div class="row3-edit" @click="openEditDialog(item)">编辑</div>
+            <div class="row3-delete" @click="openDelDialog(item)">删除</div>
           </div>
         </div>
       </div>
@@ -20,12 +20,14 @@
           <icon name="delete" class="delete-icon" @click.native="editDialog.visibility=false"></icon>
           <div class="edit-dialog-header">{{editDialog.header}}</div>
           <div style="margin-left: 2rem;margin-top: 2rem">名字</div>
-          <input style="margin-left: 2rem;padding: 0.2rem 0.2rem;width: 60%;"/>
-          <div style="margin-left: 2rem;margin-top: 2rem">描述</div>
-          <textarea style="margin-left: 2rem;width: 80%;height:5rem;resize: none;padding: 0.2rem 0.2rem"></textarea>
+          <input style="margin-left: 2rem;padding: 0.2rem 0.2rem;width: 60%;" v-model="editDialog.Name"/>
+          <div style="margin-left: 2rem;margin-top: 2rem">菜单名</div>
+          <select style="width: 80%;margin-left: 2rem" v-model="editDialog.curCategoryName">
+            <option v-for="category in categorys">{{category.Name}}</option>
+          </select>
           <div style="width: 100%;display: flex;justify-content: space-evenly;margin-top: 7rem">
-            <div style="padding: 1rem 2rem;background-color: white;cursor: pointer">取消</div>
-            <div style="padding: 1rem 2rem;background-color: white;cursor: pointer">确定</div>
+            <div style="padding: 1rem 2rem;background-color: white;cursor: pointer" @click="editDialog.visibility=false">取消</div>
+            <div style="padding: 1rem 2rem;background-color: white;cursor: pointer" @click="updateTagToServer()">确定</div>
           </div>
         </div>
       </div>
@@ -33,10 +35,10 @@
         <div class="del-dialog">
           <icon name="delete" class="delete-icon" @click.native="delDialog.visibility=false"></icon>
           <div class="edit-dialog-header">{{delDialog.header}}</div>
-          <div style="text-align: center;margin-top: 2rem">是否确定删除菜单和该菜单下的所有标签和文件？</div>
+          <div style="text-align: center;margin-top: 2rem">是否确定删除标签？</div>
           <div style="width: 100%;display: flex;justify-content: space-evenly;margin-top: 7rem">
-            <div style="padding: 1rem 2rem;background-color: white;cursor: pointer">取消</div>
-            <div style="padding: 1rem 2rem;background-color: white;cursor: pointer">确定</div>
+            <div style="padding: 1rem 2rem;background-color: white;cursor: pointer" @click="delDialog.visibility=false">取消</div>
+            <div style="padding: 1rem 2rem;background-color: white;cursor: pointer" @click="delFlag">确定</div>
           </div>
         </div>
       </div>
@@ -52,6 +54,8 @@
             editDialog:{},
             delDialog:{},
             items:[],
+            curItme:"",
+            categorys:[]
           }
       },
       created(){
@@ -62,27 +66,81 @@
           this.tableThs=["标签名","所属菜单","操作"];
           this.editDialog={
             header:"编辑菜单",
-            visibility:false
+            visibility:false,
+            curCategoryName:"",
+            Name:"",
+            isUpdating:false
           };
           this.delDialog={
             header:"编辑菜单",
-            visibility:false
+            visibility:false,
+            isDeleting:false
           }
           this.fetchData();
+          console.log('setflag');
+        },
+        openEditDialog(item){
+          this.axios.get("http://192.168.1.178:8080/ccweb/api/categories/list").then((res)=>{
+            this.categorys=res.data;
+            this.curItem=item;
+            this.editDialog.Name=this.curItem.Name;
+            this.editDialog.curCategoryName=this.curItem.Category.Name;
+            this.editDialog.visibility=true;
+          }).catch((err)=>{
+
+          });
+        },
+        updateTagToServer(){
+          if(!this.editDialog.isUpdating){
+            this.editDialog.isUpdating=true;
+            let curCategory={};
+            for(let i=0;i<this.categorys.length;i++){
+              if(this.categorys[i].Name==this.editDialog.curCategoryName){
+                curCategory=this.categorys[i];
+                break;
+              }
+            }
+            console.log(this.editDialog.Name);
+            this.axios.post("http://192.168.1.178:8080/ccweb/api/tags/update",{
+              Id:this.curItem.Id,
+              Name:this.editDialog.Name,
+              Description: "",
+              Category:curCategory,
+              Resources:null
+              }
+            ).then((res)=>{
+              this.editDialog.visibility=false;
+              this.editDialog.isUpdating=false;
+              this.fetchData();
+            }).catch((err)=>{
+            });
+          }
+        },
+        openDelDialog(item){
+          this.curItem=item;
+          this.delDialog.visibility=true;
         },
         fetchData(){
-          //从服务器获取数据
-          setTimeout(()=>{
-            let items=[
-              {flagName:"物理",belongedMenu:"高中课程"},
-              {flagName:"物理",belongedMenu:"高中课程"},
-              {flagName:"物理",belongedMenu:"高中课程"},
-              {flagName:"物理",belongedMenu:"高中课程"},
-              {flagName:"物理",belongedMenu:"高中课程"},
-              {flagName:"物理",belongedMenu:"高中课程"},
-            ]
-            this.items=items;
-          },50);
+          this.axios.get("http://192.168.1.178:8080/ccweb/api/tags/list").then((res)=>{
+            this.items=res.data;
+            console.log(this.items);
+          }).catch((err)=>{
+          });
+        },
+        delFlag(){
+          if(!this.delDialog.isDeleting){
+            this.delDialog.isDeleting=true;
+            this.axios.post("http://192.168.1.178:8080/ccweb/api/tags/delete",{
+                Id:this.curItem.Id
+              }
+            ).then((res)=>{
+              this.delDialog.isDeleting=false;
+              this.delDialog.visibility=false;
+              this.fetchData();
+            }).catch((err)=>{
+
+            });
+          }
         }
       }
     }
